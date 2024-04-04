@@ -1,4 +1,4 @@
-import scrapy
+import scrapy  # type: ignore
 import json
 from pokemon_scraping.items import PokemonItem
 
@@ -115,32 +115,38 @@ class PokemonDetailSpider(scrapy.Spider):
         )
 
         # Itérer sur chaque ligne du tableau d'attaques, en sautant l'en-tête
-        for ligne in tableau_attaques.xpath(".//tr[position() > 2]"):
-            print(ligne)
+        for ligne in tableau_attaques.xpath(".//tr"):
+            # Vérifier si la ligne contient des données d'attaque valides avant de continuer
+            if ligne.xpath("td[1]/a/text()").get() is None:
+                continue  # Saute les lignes qui ne contiennent pas de nom d'attaque
+            # print(ligne.xpath(".").get())
             nom = ligne.xpath("td[1]/a/text()").get()
-            print(nom)
+            # print(ligne.xpath("td[1]").get())
             type_attaque = ligne.xpath("td[2]//img/@alt").get()
-            print(type_attaque)
             categorie = ligne.xpath("td[3]//img/@alt").get()
-            print(categorie)
             puissance_raw = ligne.xpath("td[4]/text()").get() or "0"
-            print(puissance_raw)
             precision_raw = ligne.xpath("td[5]/text()").get() or "0"
-            print(precision_raw)
-            pp = ligne.xpath("td[6]/text()").get()
-            print(pp)
+            pp_raw = ligne.xpath("td[6]/text()").get()
 
-            # Gestion de la puissance et de la précision
-            puissance = (
-                0
-                if "-" in puissance_raw
-                else int(puissance_raw.split(",")[0].split(" ")[0])
-            )
-            precision = (
-                int(precision_raw.replace("%", ""))
-                if precision_raw.replace("%", "").isdigit()
-                else 0
-            )
+            # Gestion de la puissance et de la précision avec un bloc try-except
+            try:
+                puissance = (
+                    0
+                    if "—" in puissance_raw
+                    else int(puissance_raw.split(",")[0].split(" ")[0])
+                )
+            except ValueError:
+                puissance = 0  # Assigne 0 si la conversion échoue
+
+            try:
+                precision = (
+                    int(precision_raw.replace("%", "")) if "%" in precision_raw else 0
+                )
+            except ValueError:
+                precision = 0  # Assigne 0 si la conversion échoue
+
+            # Gestion des PP
+            pp = int(pp_raw) if pp_raw and pp_raw.isdigit() else 0
 
             attaque = {
                 "Nom": nom,
@@ -148,12 +154,10 @@ class PokemonDetailSpider(scrapy.Spider):
                 "Catégorie": categorie,
                 "Puissance": puissance,
                 "Précision": precision,
-                "PP": int(pp) if pp.isdigit() else 0,
+                "PP": pp,
             }
             attaques.append(attaque)
 
         pokemon_item["attaques"] = attaques
-
-        print(tableau_attaques)
 
         yield pokemon_item
